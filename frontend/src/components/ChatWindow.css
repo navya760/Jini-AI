@@ -1,0 +1,23 @@
+.chat-window {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  height: 520px;
+  overflow-y: auto;
+  background: #f8fafc;
+}
+
+.empty-state {
+  margin: auto;
+  color: #6b7280;
+  font-size: 1rem;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .chat-window {
+    padding: 18px;
+    height: 100%;
+  }
+}
