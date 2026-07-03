@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Header from './components/Header';
 import ChatWindow from './components/ChatWindow';
 import ChatInput from './components/ChatInput';
+import VoiceButton from './components/VoiceButton';
+import SpeechControls from './components/SpeechControls';
+import useVoiceInput from './hooks/useVoiceInput';
+import useTextToSpeech from './hooks/useTextToSpeech';
 import { webSocketService } from './services/websocket';
+import { ChatMessage, WSClientMessage, WSResponseMessage } from './types/assistant';
 
-type ChatMessage = {
-  sender: 'user' | 'ai' | 'system';
-  text: string;
-};
+const DEFAULT_SESSION_ID = 'default';
 
 function App() {
   const [connected, setConnected] = useState(false);
@@ -17,115 +19,198 @@ function App() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // ✅ Connect to WebSocket when app loads
+const {
+  isRecording,
+  supported,
+  error,
+  startRecording,
+  stopRecording,
+  onAutoStop,
+} = useVoiceInput();  const {
+    supported: speechSupported,
+    state: speechState,
+    muted,
+    latestReply,
+    speak,
+    stop: stopSpeech,
+    playAgain,
+    setMuted,
+  } = useTextToSpeech();
+
   useEffect(() => {
     const initializeWebSocket = async () => {
+      webSocketService.on('open', () => {
+        setConnected(true);
+        setMessages((current) => [
+          ...current,
+          { sender: 'system', text: 'Connected to Jini AI 🟢' },
+        ]);
+      });
+
+      webSocketService.on('message', (message: string | WSResponseMessage) => {
+        handleBackendMessage(message);
+      });
+
+      webSocketService.on('close', () => {
+        setConnected(false);
+        setMessages((current) => [
+          ...current,
+          { sender: 'system', text: 'Disconnected from Jini AI. Please refresh to reconnect.' },
+        ]);
+      });
+
+      webSocketService.on('error', (event: any) => {
+        console.error('WebSocket error:', event);
+        setConnected(false);
+        setMessages((current) => [
+          ...current,
+          { sender: 'system', text: 'Connection error. Check the backend and try again.' },
+        ]);
+      });
+
       try {
-        // Register event callbacks
-        webSocketService.on('onOpen', () => {
-          console.log('✅ Connected to Jini AI');
-          setConnected(true);
-          setMessages((current) => [
-            ...current,
-            { sender: 'system', text: 'Connected to Jini AI! 🟢' },
-          ]);
-        });
-
-        webSocketService.on('onMessage', (data) => {
-          console.log('📩 Message received:', data);
-          // Handle backend reply
-          handleBackendMessage(data);
-          setIsLoading(false);
-        });
-
-        webSocketService.on('onClose', () => {
-          console.log('❌ Disconnected from Jini AI');
-          setConnected(false);
-          setMessages((current) => [
-            ...current,
-            { sender: 'system', text: 'Disconnected from Jini AI. Refresh to reconnect.' },
-          ]);
-        });
-
-        webSocketService.on('onError', (error) => {
-          console.error('⚠️ WebSocket error:', error);
-          setConnected(false);
-          setMessages((current) => [
-            ...current,
-            { sender: 'system', text: '❌ Connection error. Please check if the server is running.' },
-          ]);
-        });
-
-        // Connect to WebSocket
         await webSocketService.connect();
-      } catch (error) {
-        console.error('Failed to connect:', error);
+      } catch (connectError) {
         setConnected(false);
         setMessages((current) => [
           ...current,
           {
             sender: 'system',
-            text: '❌ Failed to connect to Jini AI. Make sure the server is running on ws://127.0.0.1:8000/ws',
+            text: 'Unable to connect. Confirm FastAPI backend is running at ws://127.0.0.1:8001/ws',
           },
         ]);
       }
     };
 
     initializeWebSocket();
-
-    // Cleanup: disconnect when app unmounts
     return () => {
       webSocketService.disconnect();
     };
   }, []);
 
-  // Handle backend message and display it
-  const handleBackendMessage = (data: any) => {
-    let aiReply = '';
-
-    // Handle different response formats from backend
-    if (typeof data === 'string') {
-      aiReply = data;
-    } else if (data.message) {
-      aiReply = data.message;
-    } else if (data.reply) {
-      aiReply = data.reply;
-    } else if (data.text) {
-      aiReply = data.text;
-    } else {
-      aiReply = JSON.stringify(data);
+  useEffect(() => {
+    if (error) {
+      setMessages((current) => [...current, { sender: 'system', text: error }] );
     }
+  }, [error]);
 
-    setMessages((current) => [...current, { sender: 'ai', text: aiReply }]);
+  const appendMessage = (message: ChatMessage) => {
+    setMessages((current) => [...current, message]);
   };
 
-  // Send message through WebSocket
-  const handleSend = () => {
-    const trimmed = input.trim();
-    if (!trimmed || !connected || isLoading) {
+  const appendAiResponse = (text: string) => {
+    appendMessage({ sender: 'ai', text });
+    speak(text);
+  };
+
+  const handleBackendMessage = (message: WSResponseMessage | string) => {
+    setIsLoading(false);
+
+    if (typeof message === 'string') {
+      appendAiResponse(message);
       return;
     }
 
-    // Add user message to chat
-    setMessages((current) => [...current, { sender: 'user', text: trimmed }]);
+    if (message.type === 'assistant.response') {
+      appendAiResponse(message.payload.message);
+      return;
+    }
+
+    if (message.type === 'assistant.error') {
+      appendMessage({ sender: 'system', text: `Error: ${message.payload.message}` });
+      return;
+    }
+
+    if (message.payload?.message) {
+      appendAiResponse(message.payload.message);
+      return;
+    }
+
+    appendMessage({ sender: 'system', text: 'Received an unexpected response from the assistant.' });
+  };
+
+  const sendTextMessage = (text: string) => {
+    if (!connected || isLoading) return;
+
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    appendMessage({ sender: 'user', text: trimmed });
     setInput('');
     setIsLoading(true);
 
-    // Send to backend
-    try {
-      webSocketService.sendMessage({
-        type: 'message',
-        content: trimmed,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      setMessages((current) => [
-        ...current,
-        { sender: 'system', text: '❌ Failed to send message. Please try again.' },
-      ]);
-      setIsLoading(false);
+    const payload: WSClientMessage = {
+      type: 'text',
+      payload: { message: trimmed },
+      sessionId: DEFAULT_SESSION_ID,
+    };
+
+    webSocketService.sendMessage(payload);
+  };
+
+  const handleSend = () => {
+    sendTextMessage(input);
+  };
+const sendVoiceMessage = async () => {
+  const audioData = await stopRecording();
+
+  if (!audioData) {
+    appendMessage({
+      sender: "system",
+      text: "No audio captured. Please try again.",
+    });
+    return;
+  }
+
+  appendMessage({
+    sender: "user",
+    text: "Voice message sent to Jini AI…",
+  });
+
+  setIsLoading(true);
+
+  const payload: WSClientMessage = {
+    type: "voice",
+    payload: {
+      audio: audioData.base64,
+      mimeType: audioData.mimeType,
+    },
+    sessionId: DEFAULT_SESSION_ID,
+  };
+
+  webSocketService.sendMessage(payload);
+};
+  const handleVoiceToggle = async () => {
+    if (!supported) {
+      appendMessage({ sender: 'system', text: 'Voice recording is not supported in this browser.' });
+      return;
     }
+
+    if (isRecording) {
+      const audioData = await stopRecording();
+      if (!audioData) {
+        appendMessage({ sender: 'system', text: 'No audio captured. Please try again.' });
+        return;
+      }
+
+      appendMessage({ sender: 'user', text: 'Voice message sent to Jini AI…' });
+      setIsLoading(true);
+
+      const payload: WSClientMessage = {
+        type: 'voice',
+        payload: {
+          audio: audioData.base64,
+          mimeType: audioData.mimeType,
+        },
+        sessionId: DEFAULT_SESSION_ID,
+      };
+
+      webSocketService.sendMessage(payload);
+      return;
+    }
+
+    await startRecording();
+    appendMessage({ sender: 'system', text: 'Listening... Speak naturally into your microphone.' });
   };
 
   return (
@@ -133,16 +218,28 @@ function App() {
       <div className="app-card">
         <Header connected={connected} />
         <ChatWindow messages={messages} />
-        <ChatInput
-          value={input}
-          onChange={setInput}
-          onSend={handleSend}
-          // Disable input if not connected or loading
-          disabled={!connected || isLoading}
+        <SpeechControls
+          supported={speechSupported}
+          state={speechState}
+          muted={muted}
+          latestReply={latestReply}
+          onToggleMute={() => setMuted(!muted)}
+          onStop={stopSpeech}
+          onPlayAgain={playAgain}
         />
+        <div className="chat-actions">
+          <VoiceButton
+            active={isRecording}
+            disabled={!connected || isLoading}
+            onStart={handleVoiceToggle}
+            onStop={handleVoiceToggle}
+          />
+          <ChatInput value={input} onChange={setInput} onSend={handleSend} disabled={!connected || isLoading} />
+        </div>
       </div>
     </div>
   );
 }
 
 export default App;
+

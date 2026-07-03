@@ -1,9 +1,19 @@
-.chat-window {
+/* .chat-window {
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 24px;
   height: 520px;
+  overflow-y: auto;
+  background: #f8fafc;
+} */
+ .chat-window {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  height: 100vh;   /* full screen height */
+  width: 100%;
   overflow-y: auto;
   background: #f8fafc;
 }

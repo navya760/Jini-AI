@@ -23,12 +23,12 @@ function ChatInput({ value, onChange, onSend, disabled = false }: ChatInputProps
         value={value}
         onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={disabled ? 'Connecting...' : 'Type your message...'}
-        aria-label="Type a message"
+        placeholder={disabled ? 'Waiting for Jini AI…' : 'Type a message…'}
+        aria-label="Type a chat message"
         disabled={disabled}
       />
       <button onClick={onSend} disabled={!value.trim() || disabled}>
-        {disabled ? '⏳' : '📤'}
+        Send
       </button>
     </div>
   );

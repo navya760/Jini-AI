@@ -1,11 +1,7 @@
 import { useEffect, useRef } from 'react';
 import Message from './Message';
 import './ChatWindow.css';
-
-type ChatMessage = {
-  sender: 'user' | 'ai' | 'system';
-  text: string;
-};
+import { ChatMessage } from '../types/assistant';
 
 type ChatWindowProps = {
   messages: ChatMessage[];
@@ -21,15 +17,15 @@ function ChatWindow({ messages }: ChatWindowProps) {
   }, [messages]);
 
   return (
-    <div className="chat-window" ref={listRef}>
+    <section className="chat-window" ref={listRef} aria-live="polite">
       {messages.length === 0 ? (
-        <div className="empty-state">Start chatting with Jini AI</div>
+        <div className="empty-state">Start chatting with Jini AI.</div>
       ) : (
         messages.map((message, index) => (
-          <Message key={index} text={message.text} sender={message.sender === 'user' ? 'user' : 'ai'} />
+          <Message key={index} text={message.text} sender={message.sender} />
         ))
       )}
-    </div>
+    </section>
   );
 }
 

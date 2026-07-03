@@ -1,0 +1,31 @@
+{
+  "name": "jini-sdk",
+  "version": "0.1.0",
+  "description": "Embeddable Jini AI SDK for browser and npm integration.",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "jini",
+    "sdk",
+    "websocket",
+    "assistant",
+    "browser",
+    "embed"
+  ],
+  "author": "Jini AI",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-typescript": "^11.1.0",
+    "@rollup/plugin-terser": "^0.4.4",
+    "rollup": "^3.8.0",
+    "typescript": "^5.5.4"
+  }
+}
