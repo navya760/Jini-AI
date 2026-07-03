@@ -1,41 +1,172 @@
 .message-row {
-  display: flex;
-  width: 100%;
-}
 
-.message-ai {
-  justify-content: flex-start;
+  display: flex;
+
+  flex-direction: column;
+
+  width: 100%;
+
 }
+ 
+.message-bubble {
+
+  max-width: 82%;
+
+  padding: 14px 16px;
+
+  border-radius: 22px;
+
+  line-height: 1.5;
+
+  font-size: 0.98rem;
+
+  box-shadow: 0 10px 24px rgba(146, 173, 255, 0.08);
+
+}
+ 
+/* ⭐ IMPORTANT FIX HERE */
+
+.message-actions {
+
+  align-self: flex-end;  /* RIGHT SIDE */
+
+  margin-top: 2px;       /* VERY CLOSE TO MESSAGE */
+
+  margin-right: 6px;
+
+  display: flex;
+justify-content: flex-start;  /* LEFT SIDE */
+}
+ 
+/* icon only */
+
+.copy-button {
+
+  background: none;
+
+  border: none;
+
+  padding: 0;
+
+  margin: 0;
+
+  cursor: pointer;
+
+  color: #200707;
+
+  display: flex;
+
+  align-items: center;
+
+}
+ 
+.copy-button:hover {
+
+  color: #111;
+
+}
+ 
+ 
+.message-row {
+
+  display: flex;
+
+  flex-direction: column;
+
+  width: 100%;
+
+}
+ 
+/* ⭐ USER RIGHT SIDE */
 
 .message-user {
-  justify-content: flex-end;
-}
 
+  align-items: flex-end;
+
+}
+ 
+/* ⭐ AI LEFT SIDE */
+
+.message-ai {
+
+  align-items: flex-start;
+
+}
+ 
 .message-bubble {
+
   max-width: 82%;
+
   padding: 14px 16px;
+
   border-radius: 22px;
-  line-height: 1.5;
+line-height: 1.5;
+
   font-size: 0.98rem;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
+ 
+/* AI style */
 
-.message-ai .message-bubble {
-  background: #eef2ff;
-  color: #1f2937;
-  border-bottom-left-radius: 4px;
+/* .message-ai .message-bubble {
+  background: #03060f;
+  color: #ffffff;
+} */
+ .message-ai .message-bubble {
+  background: #f1f5f9;   /* light grey */
+  color: #111827;
 }
+ 
+/* USER style */
 
 .message-user .message-bubble {
-  background: #2563eb;
-  color: #ffffff;
-  border-bottom-right-radius: 4px;
+  background: #2563eb !important;
+  color: white !important;
+  box-shadow: 0 0 25px rgba(37, 99, 235, 0.45) !important;
 }
+ 
 
-@media (max-width: 640px) {
-  .message-bubble {
-    max-width: 100%;
-    padding: 12px 14px;
-    font-size: 0.95rem;
-  }
+.message-user .message-bubble:hover {
+  box-shadow: 0 0 25px rgba(235, 37, 86, 0.45);
+  transform: translateY(-2px);
 }
+ 
+/* COPY ICON RIGHT BELOW AI MESSAGE */
+
+.message-actions {
+
+  width: 100%;
+
+  display: flex;
+
+  justify-content: flex-start;
+
+  margin-top: 3px;
+
+  padding-left: 8px;
+
+}
+ 
+.copy-button {
+
+  background: none;
+
+  border: none;
+
+  padding: 0;
+
+  cursor: pointer;
+
+  color: #130505;
+
+  display: flex;
+
+  align-items: center;
+
+}
+.copy-button:hover {
+
+  color: #111;
+
+}
+ 

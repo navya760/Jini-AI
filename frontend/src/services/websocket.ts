@@ -1,42 +1,30 @@
-/**
- * WebSocket Service for Real-time Communication
- * Manages WebSocket connections and provides event callbacks
- */
+import { WSClientMessage } from '../types/assistant';
 
 type MessageCallback = (data: any) => void;
 type VoidCallback = () => void;
 type ErrorCallback = (error: Event) => void;
 
 interface WebSocketCallbacks {
-  onOpen?: VoidCallback;
-  onMessage?: MessageCallback;
-  onClose?: VoidCallback;
-  onError?: ErrorCallback;
+  open?: VoidCallback;
+  message?: MessageCallback;
+  close?: VoidCallback;
+  error?: ErrorCallback;
 }
 
 class WebSocketService {
   private ws: WebSocket | null = null;
   private url: string;
-  private isConnected: boolean = false;
+  private isConnected = false;
   private callbacks: WebSocketCallbacks = {};
 
-  constructor(url: string = 'ws://127.0.0.1:8000/ws') {
+constructor(url: string = 'ws://127.0.0.1:8000/ws')   {
     this.url = url;
   }
 
-  /**
-   * Register event callbacks
-   * @param event - Event name ('onOpen', 'onMessage', 'onClose', 'onError')
-   * @param callback - Callback function to execute
-   */
   public on(event: keyof WebSocketCallbacks, callback: any): void {
     this.callbacks[event] = callback;
   }
 
-  /**
-   * Connect to the WebSocket server
-   * @returns Promise that resolves when connected
-   */
   public connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
@@ -44,31 +32,29 @@ class WebSocketService {
 
         this.ws.onopen = () => {
           this.isConnected = true;
-          console.log('[WebSocket] Connected');
-          this.callbacks.onOpen?.();
+          this.callbacks.open?.();
           resolve();
         };
 
-        this.ws.onmessage = (event: MessageEvent) => {
+        this.ws.onmessage = (event: MessageEvent<string>) => {
+          let payload: any = event.data;
           try {
-            const data = JSON.parse(event.data);
-            this.callbacks.onMessage?.(data);
+            payload = JSON.parse(event.data);
           } catch (error) {
-            console.error('[WebSocket] Failed to parse JSON:', error);
-            this.callbacks.onMessage?.(event.data);
+            console.warn('[WebSocket] Received non-JSON payload');
           }
+          this.callbacks.message?.(payload);
         };
 
         this.ws.onclose = () => {
           this.isConnected = false;
-          console.log('[WebSocket] Disconnected');
-          this.callbacks.onClose?.();
+          this.callbacks.close?.();
         };
 
-        this.ws.onerror = (error: Event) => {
-          console.error('[WebSocket] Error:', error);
-          this.callbacks.onError?.(error);
-          reject(error);
+        this.ws.onerror = (event: Event) => {
+          this.isConnected = false;
+          this.callbacks.error?.(event);
+          reject(event);
         };
       } catch (error) {
         reject(error);
@@ -76,9 +62,6 @@ class WebSocketService {
     });
   }
 
-  /**
-   * Disconnect from the WebSocket server
-   */
   public disconnect(): void {
     if (this.ws) {
       this.ws.close();
@@ -87,37 +70,20 @@ class WebSocketService {
     this.isConnected = false;
   }
 
-  /**
-   * Send a message to the server
-   * @param message - Message to send (string or object)
-   */
-  public sendMessage(message: any): void {
+  public sendMessage(message: WSClientMessage | string): void {
     if (!this.isConnected || !this.ws) {
-      console.warn('[WebSocket] Cannot send - not connected');
+      console.warn('[WebSocket] Cannot send - no active connection');
       return;
     }
 
-    try {
-      const messageString = typeof message === 'string'
-        ? message
-        : JSON.stringify(message);
-      this.ws.send(messageString);
-    } catch (error) {
-      console.error('[WebSocket] Failed to send message:', error);
-    }
+    const payload = typeof message === 'string' ? message : JSON.stringify(message);
+    this.ws.send(payload);
   }
 
-  /**
-   * Check connection status
-   * @returns true if connected to the server
-   */
   public isConnectedToServer(): boolean {
     return this.isConnected;
   }
 }
 
-// Export singleton instance
 export const webSocketService = new WebSocketService();
-
-// Export the class for advanced usage
 export default WebSocketService;
