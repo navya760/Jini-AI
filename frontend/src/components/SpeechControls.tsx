@@ -17,7 +17,7 @@ function SpeechControls({ supported, state, muted, latestReply, onToggleMute, on
   return (
     <div className="speech-controls" aria-live="polite">
       <div className="speech-status">
-        <span className={`speech-indicator ${isActive ? 'active' : ''}`} aria-hidden="true" />
+        {/* <span className={`speech-indicator ${isActive ? 'active' : ''}`} aria-hidden="true" /> */}
         {/* <span>
           {supported
             ? isActive

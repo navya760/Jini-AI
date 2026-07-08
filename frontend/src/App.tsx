@@ -1,32 +1,40 @@
-import { useEffect, useState } from 'react';
-import Header from './components/Header';
-import ChatWindow from './components/ChatWindow';
-import ChatInput from './components/ChatInput';
-import VoiceButton from './components/VoiceButton';
+import { useEffect, useRef, useState } from 'react';
 import SpeechControls from './components/SpeechControls';
 import useVoiceInput from './hooks/useVoiceInput';
 import useTextToSpeech from './hooks/useTextToSpeech';
 import { webSocketService } from './services/websocket';
 import { ChatMessage, WSClientMessage, WSResponseMessage } from './types/assistant';
 
+import Navbar from './components/Navbar';
+import ChatArea from './components/ChatArea';
+import InputBox from './components/InputBox';
+import SimpleUI from './components/SimpleUI';
+
+import './components/ui.css';
+
 const DEFAULT_SESSION_ID = 'default';
 
 function App() {
   const [connected, setConnected] = useState(false);
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { sender: 'system', text: 'Connecting to Jini AI...' },
-  ]);
+  // const [messages, setMessages] = useState<ChatMessage[]>([
+  //   { sender: 'system', text: 'Connecting to Jini AI...' },
+  // ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+const shouldSpeakReply = useRef(false);
+  // UI-only tab state (does not affect backend)
+  const [activeTab, setActiveTab] = useState('chat');
 
-const {
-  isRecording,
-  supported,
-  error,
-  startRecording,
-  stopRecording,
-  onAutoStop,
-} = useVoiceInput();  const {
+  const {
+    isRecording,
+    supported,
+    error,
+    startRecording,
+    stopRecording,
+  } = useVoiceInput();
+
+  const {
     supported: speechSupported,
     state: speechState,
     muted,
@@ -41,10 +49,10 @@ const {
     const initializeWebSocket = async () => {
       webSocketService.on('open', () => {
         setConnected(true);
-        setMessages((current) => [
-          ...current,
-          { sender: 'system', text: 'Connected to Jini AI 🟢' },
-        ]);
+      //   setMessages((current) => [
+      //     ...current,
+      //     { sender: 'system', text: 'Connected to Jini AI 🟢' },
+      //   ]);
       });
 
       webSocketService.on('message', (message: string | WSResponseMessage) => {
@@ -53,32 +61,32 @@ const {
 
       webSocketService.on('close', () => {
         setConnected(false);
-        setMessages((current) => [
-          ...current,
-          { sender: 'system', text: 'Disconnected from Jini AI. Please refresh to reconnect.' },
-        ]);
+        // setMessages((current) => [
+        //   ...current,
+        //   { sender: 'system', text: 'Disconnected from Jini AI. Please refresh to reconnect.' },
+        // ]);
       });
 
       webSocketService.on('error', (event: any) => {
         console.error('WebSocket error:', event);
         setConnected(false);
-        setMessages((current) => [
-          ...current,
-          { sender: 'system', text: 'Connection error. Check the backend and try again.' },
-        ]);
+        // setMessages((current) => [
+        //   ...current,
+        //   { sender: 'system', text: 'Connection error. Check the backend and try again.' },
+        // ]);
       });
 
       try {
         await webSocketService.connect();
       } catch (connectError) {
         setConnected(false);
-        setMessages((current) => [
-          ...current,
-          {
-            sender: 'system',
-            text: 'Unable to connect. Confirm FastAPI backend is running at ws://127.0.0.1:8001/ws',
-          },
-        ]);
+        // setMessages((current) => [
+        //   ...current,
+        //   {
+        //     sender: 'system',
+        //     text: 'Unable to connect. Confirm FastAPI backend is running at ws://127.0.0.1:8001/ws',
+        //   },
+        // ]);
       }
     };
 
@@ -99,9 +107,13 @@ const {
   };
 
   const appendAiResponse = (text: string) => {
-    appendMessage({ sender: 'ai', text });
+  appendMessage({ sender: 'ai', text });
+
+  if (shouldSpeakReply.current) {
     speak(text);
-  };
+    shouldSpeakReply.current = false;
+  }
+};
 
   const handleBackendMessage = (message: WSResponseMessage | string) => {
     setIsLoading(false);
@@ -148,39 +160,39 @@ const {
     webSocketService.sendMessage(payload);
   };
 
-  const handleSend = () => {
-    sendTextMessage(input);
-  };
-const sendVoiceMessage = async () => {
-  const audioData = await stopRecording();
-
-  if (!audioData) {
-    appendMessage({
-      sender: "system",
-      text: "No audio captured. Please try again.",
-    });
-    return;
-  }
-
-  appendMessage({
-    sender: "user",
-    text: "Voice message sent to Jini AI…",
-  });
-
-  setIsLoading(true);
-
-  const payload: WSClientMessage = {
-    type: "voice",
-    payload: {
-      audio: audioData.base64,
-      mimeType: audioData.mimeType,
-    },
-    sessionId: DEFAULT_SESSION_ID,
-  };
-
-  webSocketService.sendMessage(payload);
+ const handleSend = () => {
+  shouldSpeakReply.current = false;
+  sendTextMessage(input);
 };
+
+  const sendVoiceMessage = async () => {
+    const audioData = await stopRecording();
+
+    if (!audioData) {
+      appendMessage({
+        sender: 'system',
+        text: 'No audio captured. Please try again.',
+      });
+      return;
+    }
+
+    appendMessage({ sender: 'user', text: 'Voice message sent to Jini AI…' });
+    setIsLoading(true);
+
+    const payload: WSClientMessage = {
+      type: 'voice',
+      payload: {
+        audio: audioData.base64,
+        mimeType: audioData.mimeType,
+      },
+      sessionId: DEFAULT_SESSION_ID,
+    };
+
+    webSocketService.sendMessage(payload);
+  };
+
   const handleVoiceToggle = async () => {
+    
     if (!supported) {
       appendMessage({ sender: 'system', text: 'Voice recording is not supported in this browser.' });
       return;
@@ -204,38 +216,52 @@ const sendVoiceMessage = async () => {
         },
         sessionId: DEFAULT_SESSION_ID,
       };
-
+shouldSpeakReply.current = true;
       webSocketService.sendMessage(payload);
       return;
     }
 
     await startRecording();
-    appendMessage({ sender: 'system', text: 'Listening... Speak naturally into your microphone.' });
+    // appendMessage({ sender: 'system', text: 'Listening... Speak naturally into your microphone.' });
   };
 
   return (
     <div className="app-shell">
       <div className="app-card">
-        <Header connected={connected} />
-        <ChatWindow messages={messages} />
-        <SpeechControls
-          supported={speechSupported}
-          state={speechState}
-          muted={muted}
-          latestReply={latestReply}
-          onToggleMute={() => setMuted(!muted)}
-          onStop={stopSpeech}
-          onPlayAgain={playAgain}
-        />
-        <div className="chat-actions">
-          <VoiceButton
-            active={isRecording}
-            disabled={!connected || isLoading}
-            onStart={handleVoiceToggle}
-            onStop={handleVoiceToggle}
+        <Navbar connected={connected} activeTab={activeTab} onChangeTab={setActiveTab} />
+
+        {activeTab === 'simple' ? (
+          <SimpleUI
+            onOpenChat={() => setActiveTab('chat')}
+            onMicToggle={handleVoiceToggle}
+            isRecording={isRecording}
+            latestReply={latestReply}
           />
-          <ChatInput value={input} onChange={setInput} onSend={handleSend} disabled={!connected || isLoading} />
-        </div>
+        ) : (
+          <>
+            <ChatArea messages={messages} />
+
+            <SpeechControls
+              supported={speechSupported}
+              state={speechState}
+              muted={muted}
+              latestReply={latestReply}
+              onToggleMute={() => setMuted(!muted)}
+              onStop={stopSpeech}
+              onPlayAgain={playAgain}
+            />
+
+            <InputBox
+              value={input}
+              onChange={setInput}
+              onSend={handleSend}
+              onMicToggle={handleVoiceToggle}
+              isRecording={isRecording}
+              disabled={!connected || isLoading}
+              isLoading={isLoading}
+            />
+          </>
+        )}
       </div>
     </div>
   );
