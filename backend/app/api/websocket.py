@@ -1,171 +1,272 @@
+# import json
+
+# from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+# from app.core.services import ai_service
+# from app.services.tts_service import tts_service
+
+# router = APIRouter()
+
+
+# @router.websocket("/ws")
+# async def websocket_endpoint(websocket: WebSocket):
+#     await websocket.accept()
+#     print("Client connected")
+
+#     try:
+#         while True:
+#             raw = await websocket.receive_text()
+#             print("Received:", raw)
+
+#             # Parse JSON from frontend
+#             try:
+#                 data = json.loads(raw)
+#                 user_message = data.get("payload", {}).get("message", "")
+#             except Exception:
+#                 user_message = raw
+
+#             # AI response
+#             reply = await ai_service.generate_response(
+#                 user_message=user_message,
+#                 history=[]
+#             )
+
+#             # TTS disabled temporarily
+#             audio_url = await tts_service.synthesize(
+#     reply,
+#     voice="af_heart"
+# )
+
+#             # Send response
+#             # await websocket.send_json({
+#             #     "type": "assistant.response",
+#             #     "payload": {
+#             #         "message": reply,
+#             #         "audio_url": audio_url
+#             #     }
+#             # })
+
+#             await websocket.send_json({
+#     "type": "assistant.response",
+#     "payload": {
+#         "message": reply,
+#         "audio_url": audio_url
+#     }
+# })
+
+#     except WebSocketDisconnect:
+#         print("Client disconnected")
+
+
+# import json
+
+# from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+# from app.core.services import ai_service
+
+# router = APIRouter()
+
+
+# @router.websocket("/ws")
+# async def websocket_endpoint(websocket: WebSocket):
+#     await websocket.accept()
+#     print("✅ Client connected")
+
+#     try:
+#         while True:
+#             raw = await websocket.receive_text()
+#             print("Received:", raw)
+
+#             # Parse frontend JSON
+#             try:
+#                 data = json.loads(raw)
+
+#                 if isinstance(data, dict):
+#                     user_message = (
+#                         data.get("payload", {}).get("message")
+#                         or data.get("message")
+#                         or raw
+#                     )
+#                 else:
+#                     user_message = raw
+
+#             except Exception:
+#                 user_message = raw
+
+#             # Generate AI reply
+#             reply = await ai_service.generate_response(
+#                 user_message=user_message,
+#                 history=[]
+#             )
+
+#             # Send response (NO TTS)
+#             await websocket.send_json({
+#                 "type": "assistant.response",
+#                 "payload": {
+#                     "message": reply,
+#                     "audio_url": None
+#                 }
+#             })
+
+#     except WebSocketDisconnect:
+#         print("❌ Client disconnected")
+
+#     except Exception as e:
+#         print("Backend Error:", e)
+
+#         await websocket.send_json({
+#             "type": "assistant.error",
+#             "payload": {
+#                 "message": str(e)
+#             }
+#         })
+
+
+
+# import json
+
+# from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+# from app.core.services import ai_service
+
+# router = APIRouter()
+
+
+# @router.websocket("/ws")
+# async def websocket_endpoint(websocket: WebSocket):
+#     await websocket.accept()
+#     print("✅ Client connected")
+
+#     try:
+#         while True:
+#             raw = await websocket.receive_text()
+
+#             print("Received:", raw)
+
+#             try:
+#                 data = json.loads(raw)
+
+#                 if isinstance(data, dict):
+#                     if "payload" in data and "message" in data["payload"]:
+#                         user_message = data["payload"]["message"]
+#                     elif "message" in data:
+#                         user_message = data["message"]
+#                     else:
+#                         user_message = raw
+#                 else:
+#                     user_message = raw
+
+#             except Exception:
+#                 user_message = raw
+
+#             print("User message:", user_message[:100])
+
+#             reply = await ai_service.generate_response(
+#                 user_message=user_message,
+#                 history=[]
+#             )
+
+#             await websocket.send_json({
+#                 "type": "assistant.response",
+#                 "payload": {
+#                     "message": reply,
+#                     "audio_url": None
+#                 }
+#             })
+
+#     except WebSocketDisconnect:
+#         print("❌ Client disconnected")
+
+#     except Exception as e:
+#         print("Backend Error:", e)
+
+#         await websocket.send_json({
+#             "type": "assistant.error",
+#             "payload": {
+#                 "message": str(e)
+#             }
+#         })
+
+
 import json
-import logging
-from typing import Any, Dict, List, Optional
-
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from pydantic import ValidationError
+from app.core.services import ai_service, voice_service
 
-from app.core.services import ai_service, memory_service, voice_service
-from app.models.schemas import WSMessage
-
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-class ConnectionManager:
-    def __init__(self) -> None:
-        self.active_connections: List[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket) -> None:
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket) -> None:
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-
-    async def send_json(self, websocket: WebSocket, data: Dict[str, Any]) -> None:
-        await websocket.send_text(json.dumps(data))
-
-
-manager = ConnectionManager()
-
-
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket) -> None:
-    await manager.connect(websocket)
-    session_id: Optional[str] = None
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    print("✅ Client connected")
 
     try:
         while True:
+            raw = await websocket.receive_text()
+            print("Received:", raw)
+
+            # Parse message safely
             try:
-                raw_text = await websocket.receive_text()
-            except WebSocketDisconnect:
-                logger.info("WebSocket disconnected during receive")
-                break
+                
+                data = json.loads(raw)
 
-            logger.info("Received websocket message: %s", raw_text)
-            session_id = "default"
-
-            try:
-                payload = WSMessage.model_validate_json(raw_text)
-            except (ValidationError, json.JSONDecodeError) as exc:
-                logger.exception("Invalid websocket payload")
-                await manager.send_json(
-                    websocket,
-                    {
-                        "type": "assistant.error",
-                        "payload": {"message": f"Invalid websocket payload: {exc}"},
-                    },
-                )
-                continue
-
-            session_id = payload.session_id or "default"
-
-            try:
-                if payload.type == "text":
-                    user_message = payload.payload.get("message", "") or ""
-                    memory_service.add_message(session_id, "user", user_message)
-
-                    assistant_reply = await ai_service.generate_response(
-                        user_message=user_message,
-                        history=memory_service.get_history(session_id),
-                    )
-                    memory_service.add_message(session_id, "assistant", assistant_reply)
-
-                    await manager.send_json(
-                        websocket,
-                        {
-                            "type": "assistant.response",
-                            "session_id": session_id,
-                            "payload": {"message": assistant_reply},
-                        },
-                    )
-
-                elif payload.type == "voice":
-                    if voice_service is None:
-                        await manager.send_json(
-                            websocket,
-                            {
-                                "type": "assistant.error",
-                                "session_id": session_id,
-                                "payload": {"message": "Voice transcription is temporarily unavailable."},
-                            },
-                        )
-                        continue
-
-                    audio_base64 = payload.payload.get("audio", "") or ""
-                    mime_type = payload.payload.get("mimeType", "audio/webm") or "audio/webm"
-
-                    if not audio_base64:
-                        await manager.send_json(
-                            websocket,
-                            {
-                                "type": "assistant.error",
-                                "session_id": session_id,
-                                "payload": {"message": "Audio payload is missing."},
-                            },
-                        )
-                        continue
-
-                    try:
-                        transcript = await voice_service.transcribe_audio(audio_base64, mime_type)
-                    except Exception as exc:  # noqa: BLE001
-                        logger.exception("Voice transcription failed for session %s", session_id)
-                        await manager.send_json(
-                            websocket,
-                            {
-                                "type": "assistant.error",
-                                "session_id": session_id,
-                                "payload": {
-                                    "message": "Voice transcription failed. Please try again.",
-                                },
-                            },
-                        )
-                        continue
-
-                    memory_service.add_message(session_id, "user", transcript)
-
-                    assistant_reply = await ai_service.generate_response(
-                        user_message=transcript,
-                        history=memory_service.get_history(session_id),
-                    )
-                    memory_service.add_message(session_id, "assistant", assistant_reply)
-
-                    await manager.send_json(
-                        websocket,
-                        {
-                            "type": "assistant.response",
-                            "session_id": session_id,
-                            "payload": {
-                                "message": assistant_reply,
-                                "transcript": transcript,
-                            },
-                        },
-                    )
+                if isinstance(data, dict):
+                    # If this is a voice payload, transcribe the audio and use the
+                    # transcription as the user message. Sending raw JSON that
+                    # contains base64 audio was causing the Groq 413 "Request too large".
+                    if data.get("type") == "voice":
+                        audio_b64 = data.get("payload", {}).get("audio")
+                        mime_type = data.get("payload", {}).get("mimeType")
+                        if audio_b64 and voice_service:
+                            # transcribe_audio is async; await it so we only send the
+                            # resulting text to the AI model
+                            user_message = await voice_service.transcribe_audio(
+                                audio_base64=audio_b64,
+                                mime_type=mime_type or "audio/wav",
+                            )
+                        else:
+                            # Fallback to an empty message if transcription isn't available
+                            user_message = ""
+                    else:
+                        if "payload" in data and "message" in data["payload"]:
+                            user_message = data["payload"]["message"]
+                        elif "message" in data:
+                            user_message = data["message"]
+                        else:
+                            user_message = raw
                 else:
-                    await manager.send_json(
-                        websocket,
-                        {
-                            "type": "assistant.error",
-                            "session_id": session_id,
-                            "payload": {"message": "Unsupported websocket message type."},
-                        },
-                    )
-            except Exception as exc:  # noqa: BLE001
-                logger.exception("Error handling websocket message")
-                await manager.send_json(
-                    websocket,
-                    {
-                        "type": "assistant.error",
-                        "session_id": session_id,
-                        "payload": {"message": f"Backend error: {exc}"},
-                    },
-                )
+                    user_message = raw
+
+            except Exception:
+                user_message = raw
+
+            # ✅ DEBUG (FIXED POSITION)
+            print("Message Length:", len(user_message))
+            print("User message:", user_message[:300])
+
+            # AI response
+            reply = await ai_service.generate_response(
+                user_message=user_message,
+                history=[]
+            )
+
+            # Send response
+            await websocket.send_json({
+                "type": "assistant.response",
+                "payload": {
+                    "message": reply,
+                    "audio_url": None
+                }
+            })
+
     except WebSocketDisconnect:
-        logger.info("WebSocket disconnected")
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Unhandled websocket exception")
-        await websocket.close(code=1011)
-    finally:
-        manager.disconnect(websocket)
+        print("❌ Client disconnected")
+
+    except Exception as e:
+        print("Backend Error:", e)
+
+        await websocket.send_json({
+            "type": "assistant.error",
+            "payload": {
+                "message": str(e)
+            }
+        })

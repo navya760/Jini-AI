@@ -1,25 +1,25 @@
-// // import React from 'react';
-// // import './Message.css';
-// // import { ChatSender } from '../types/assistant';
+// import React from 'react';
+// import './Message.css';
+// import { ChatSender } from '../types/assistant';
 
-// // type MessageProps = {
-// //   text: string;
-// //   sender: ChatSender;
-// // };
+// type MessageProps = {
+//   text: string;
+//   sender: ChatSender;
+// };
 
-// // function Message({ text, sender }: MessageProps) {
-// //   const className = `message-row ${sender === 'user' ? 'message-user' : sender === 'ai' ? 'message-ai' : 'message-system'}`;
+// function Message({ text, sender }: MessageProps) {
+//   const className = `message-row ${sender === 'user' ? 'message-user' : sender === 'ai' ? 'message-ai' : 'message-system'}`;
 
-// //   return (
-// //     <div className={className}>
-// //       <div className="message-bubble">
-// //         <span>{text}</span>
-// //       </div>
-// //     </div>
-// //   );
-// // }
+//   return (
+//     <div className={className}>
+//       <div className="message-bubble">
+//         <span>{text}</span>
+//       </div>
+//     </div>
+//   );
+// }
 
-// // export default Message;
+// export default Message;
 // import React, { useState } from 'react';
 
 // import './Message.css';
@@ -133,7 +133,7 @@
 import React, { useState } from "react";
 import "./Message.css";
 import { ChatSender } from "../types/assistant";
-import { FiCopy, FiCheck } from "react-icons/fi";
+import { FiCopy, FiCheck, FiVolume2 } from "react-icons/fi";
 
 type MessageProps = {
   text: string;
@@ -142,6 +142,7 @@ type MessageProps = {
 
 function Message({ text, sender }: MessageProps) {
   const [copied, setCopied] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
 
   const className = `message-row ${
     sender === "user"
@@ -164,6 +165,20 @@ function Message({ text, sender }: MessageProps) {
     }
   };
 
+  const handleSpeak = () => {
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return;
+    }
+
+    setSpeaking(true);
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  };
+
   return (
     <div className={className}>
       <div className="message-bubble">
@@ -178,6 +193,13 @@ function Message({ text, sender }: MessageProps) {
             title={copied ? "Copied" : "Copy"}
           >
             {copied ? <FiCheck size={15} /> : <FiCopy size={15} />}
+          </button>
+          <button
+            className="speaker-button"
+            onClick={handleSpeak}
+            title={speaking ? "Stop" : "Speak"}
+          >
+            <FiVolume2 size={15} />
           </button>
         </div>
       )}
